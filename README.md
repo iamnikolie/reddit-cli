@@ -26,8 +26,9 @@ JSON reads, so the default source is [Arctic Shift](https://arctic-shift.photon-
 - `score` and `num_comments` are placeholders (0/1) until ~36 hours after
   posting, then match Reddit. Sorting is by date; `top` and `--sort score`
   re-rank client-side, so very fresh posts rank low.
-- Keyword search is scoped: always by subreddit(s) or author, never global.
-  Multi-word post queries search titles only (title+body times out).
+- Keyword search is scoped: always by subreddit(s) or author, never global,
+  and the archive takes one keyword per query — the CLI applies the rest of
+  a multi-word query itself over the newest 100 hits.
 - Read-only: no inbox, no voting, no posting. No live `hot` ranking.
 - It is a free community service with no uptime guarantee. The CLI keeps the
   source behind a `--source` switch so another backend can be added later.
@@ -61,7 +62,7 @@ reddit sub golang top --after 30d -n 15       # best of a window (by archived sc
 
 reddit search "cobra urfave" --sub golang --after 1y
 reddit search "sqlite wal" --sub golang --comments --after 90d
-reddit search sqlite --sub golang --in text    # single keyword: title + body
+reddit search "cobra viper" --sub golang --in title
 reddit search "launch" --author spez
 
 reddit post 1wro60n                           # post + 60 best comments, 4 levels deep
@@ -76,10 +77,11 @@ reddit subs claude --min-subscribers 500      # find communities
 reddit api /api/posts/search/aggregate -q aggregate=author -q subreddit=golang -q after=30d
 ```
 
-Post search matches titles for multi-word queries and title+body for a single
-keyword (`--in text` forces title+body; the archive times out on it beyond one
-word). Comment search has full syntax: words ANDed, `"quoted phrase"`,
-`a OR b`, `-excluded`. Dates accept `2026-09-01`, epoch seconds, or offsets like `12h`, `7d`, `3m`, `1y`.
+Post search: the archive handles one keyword per query, so the CLI sends the
+longest word and matches the remaining words and `"quoted phrases"` itself
+over the newest 100 hits (all must appear; `--in title` restricts to titles).
+Comment search has full syntax: words ANDed, `"quoted phrase"`, `a OR b`,
+`-excluded`. Dates accept `2026-09-01`, epoch seconds, or offsets like `12h`, `7d`, `3m`, `1y`.
 
 ### Output
 

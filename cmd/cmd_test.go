@@ -119,3 +119,36 @@ func TestTruncate(t *testing.T) {
 		t.Errorf("cut: %q", got)
 	}
 }
+
+func TestParseTerms(t *testing.T) {
+	tt := parseTerms(`"claude code" skills for the agent`)
+	if tt.anchor != "skills" || len(tt.phrases) != 1 || tt.phrases[0] != "claude code" || len(tt.words) != 4 {
+		t.Fatalf("got %+v", tt)
+	}
+	if got := parseTerms("cobra").anchor; got != "cobra" {
+		t.Fatalf("single: %q", got)
+	}
+	if got := parseTerms(`"the go"`).anchor; got != "the" && got != "go" {
+		t.Fatalf("phrase-only anchor: %q", got)
+	}
+	if parseTerms("cobra").needsFilter() || !parseTerms("cobra viper").needsFilter() {
+		t.Fatal("needsFilter")
+	}
+	rows := []archive.Row{
+		{"title": "Cobra vs Viper config", "selftext": ""},
+		{"title": "Cobra only", "selftext": "nothing about the other one"},
+		{"title": "unrelated", "selftext": "viper and cobra in the body"},
+	}
+	got := parseTerms("cobra viper").filter(append([]archive.Row(nil), rows...), false)
+	if len(got) != 2 {
+		t.Fatalf("text filter: %d", len(got))
+	}
+	got = parseTerms("cobra viper").filter(append([]archive.Row(nil), rows...), true)
+	if len(got) != 1 {
+		t.Fatalf("title filter: %d", len(got))
+	}
+	got = parseTerms(`"viper and cobra"`).filter(append([]archive.Row(nil), rows...), false)
+	if len(got) != 1 || archive.Str(got[0], "title") != "unrelated" {
+		t.Fatalf("phrase filter: %+v", got)
+	}
+}

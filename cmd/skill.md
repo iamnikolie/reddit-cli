@@ -19,7 +19,7 @@ Markdown goes to stdout, advisories to stderr. `--json` for machines,
 | Keyword search in posts | `reddit search "cobra urfave" --sub golang --after 1y` |
 | Search comments | `reddit search "sqlite wal" --sub golang --comments --after 90d` |
 | Search one author | `reddit search "launch" --author spez` |
-| Search bodies too (single keyword only) | `reddit search sqlite --sub golang --in text` |
+| Titles only | `reddit search "cobra viper" --sub golang --in title` |
 | Read a thread (compact tree) | `reddit post 1wro60n` or `reddit post <reddit url>` |
 | Whole thread, ids for drill-down | `reddit post 1wro60n --top 0 --depth 0 --ids` |
 | One comment subtree | `reddit post 1wro60n --parent <comment id>` |
@@ -30,10 +30,12 @@ Markdown goes to stdout, advisories to stderr. `--json` for machines,
 Search must be scoped by `--sub` (comma list) or `--author`: there is no
 global full-text index. Find candidate subreddits with `reddit subs`.
 
-Post search matches titles for multi-word queries (`"quoted phrase"` is fine)
-and title+body for a single keyword; `--in text` forces title+body but the
-archive times out on it for more than one word. Comment search (`--comments`)
-has full syntax: words ANDed, `"phrase"`, `a OR b`, `-excluded`.
+Post search: the archive takes one keyword, so the CLI sends the longest word
+and matches the other words and `"quoted phrases"` itself over the newest 100
+hits (all must appear, title+body; `--in title` for titles only). A stderr
+note tells you when that window was exhausted — narrow with `--after`.
+Comment search (`--comments`) has full syntax: words ANDed, `"phrase"`,
+`a OR b`, `-excluded`.
 
 Dates: `--after`/`--before` take `2026-09-01`, epoch seconds, or offsets like
 `12h`, `7d`, `3m`, `1y`.
