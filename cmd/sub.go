@@ -18,16 +18,22 @@ var (
 )
 
 var subCmd = &cobra.Command{
-	Use:   "sub <name>[,<name>...] [new|top]",
-	Short: "List a subreddit's posts: newest (default) or top by score in a window",
+	Use:   "sub <name>[,<name>...] [new|top|hot|rising]",
+	Short: "List a subreddit's posts: new/top from the archive, hot/rising live",
 	Long: `List posts of one or more subreddits.
 
-  new   newest posts first (default)
-  top   highest score within --after (default 7d); the archive settles scores
-        ~36h after posting, so posts younger than that rank low`,
+  new     newest posts first (default; archive, or live feed with --live)
+  top     highest score within --after (default 7d); the archive settles
+          scores ~36h after posting, so posts younger than that rank low
+  hot     reddit's live front page of the subreddit (rss source: ~1 request
+          per minute per IP, no scores in feeds)
+  rising  reddit's live rising list (rss)`,
 	Example: `  reddit sub golang -n 10
   reddit sub golang,rust new --after 24h
   reddit sub golang top --after 30d -n 20
+  reddit sub golang hot -n 10
+  reddit sub golang,rust rising
+  reddit sub golang new --live
   reddit sub selfhosted --flair "Need Help" --body 0`,
 	Args: cobra.RangeArgs(1, 2),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -35,6 +41,17 @@ var subCmd = &cobra.Command{
 		mode := "new"
 		if len(args) == 2 {
 			mode = args[1]
+		}
+		switch mode {
+		case "hot", "rising":
+			if err := needRSS("sub " + mode); err != nil {
+				return err
+			}
+			return liveSub(cmd, subs, mode)
+		case "new", "top":
+			if useRSS(false) {
+				return liveSub(cmd, subs, mode)
+			}
 		}
 		q := archive.PostQuery{Subreddits: subs, After: subAfter, Before: subBefore, Flair: subFlair, Sort: "desc", Fields: leanFields(archive.PostFields)}
 		if subNSFW != "" {

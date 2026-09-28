@@ -16,12 +16,15 @@ text on stdout, nothing costs context until it is called.
 
 > Unofficial, community-built tool. Not affiliated with, endorsed by, or supported by Reddit, Inc. or the Arctic Shift project.
 
-## Data source
+## Data sources
 
 Reddit closed self-service Data API keys in late 2025 and blocks anonymous
-JSON reads, so the default source is [Arctic Shift](https://arctic-shift.photon-reddit.com)
-— a public, no-auth archive of Reddit that ingests posts and comments within
-~1–2 minutes of posting. Know its shape before you rely on it:
+JSON reads. Two credential-free sources remain, and the CLI uses both:
+
+**archive** (default) — [Arctic Shift](https://arctic-shift.photon-reddit.com),
+a public, no-auth archive of Reddit that ingests posts and comments within
+~1–2 minutes of posting. Search, scored comment trees, user history. Know its
+shape before you rely on it:
 
 - `score` and `num_comments` are placeholders (0/1) until ~36 hours after
   posting, then match Reddit. Sorting is by date; `top` and `--sort score`
@@ -30,8 +33,15 @@ JSON reads, so the default source is [Arctic Shift](https://arctic-shift.photon-
   and the archive takes one keyword per query — the CLI applies the rest of
   a multi-word query itself over the newest 100 hits.
 - Read-only: no inbox, no voting, no posting. No live `hot` ranking.
-- It is a free community service with no uptime guarantee. The CLI keeps the
-  source behind a `--source` switch so another backend can be added later.
+- It is a free community service with no uptime guarantee.
+
+**rss** (`--live` or `--source rss`) — reddit.com's public Atom feeds: `hot`,
+`rising`, `new`, `top`, a thread's newest comments, user feeds and reddit's own
+search, as reddit ranks them right now. Feeds carry no scores and comments
+come flat. reddit.com allows roughly **one anonymous feed request per minute
+per IP**, so the CLI remembers the window across invocations and waits for it
+(up to 90s; `--no-wait` fails fast). `--source auto` (default) sends only
+`hot`/`rising` to the feeds.
 
 ## Install
 
@@ -59,6 +69,8 @@ Check what you got with `reddit version`.
 reddit sub golang -n 20                       # newest posts
 reddit sub golang,rust --after 24h            # several subreddits, merged by date
 reddit sub golang top --after 30d -n 15       # best of a window (by archived score)
+reddit sub golang hot -n 10                   # live front page of the subreddit (rss, 1 req/min)
+reddit sub golang,rust rising                 # one feed request for several subreddits
 
 reddit search "cobra urfave" --sub golang --after 1y
 reddit search "sqlite wal" --sub golang --comments --after 90d
@@ -69,6 +81,7 @@ reddit post 1wro60n                           # post + 60 best comments, 4 level
 reddit post <reddit url> --top 0 --depth 0    # everything
 reddit post 1wro60n --ids                     # comment ids for --parent drill-down
 reddit post 1wro60n --parent kx0abc1          # one subtree
+reddit post 1wro60n --live                    # newest comments from reddit.com, flat
 
 reddit user spez                              # overview: active subs + latest posts/comments
 reddit user spez comments --sub programming -n 50
@@ -115,9 +128,12 @@ Nothing is required. Optional settings live in
 `~/.reddit-cli/<profile>/config.yaml` (`reddit config show`):
 
 ```yaml
-user_agent: macos:my-tool:v1 (by /u/me)     # default: reddit-cli/<version>
+username: me            # puts "(by /u/me)" in the reddit.com User-Agent, as Reddit asks
+user_agent: macos:my-tool:v1 (by /u/me)     # overrides the generated one entirely
 archive_url: https://arctic-shift.photon-reddit.com
 ```
+
+The rss window state is kept in `~/.reddit-cli/<profile>/rss-window.json`.
 
 Environment overrides: `REDDIT_CONFIG` (profile), `REDDIT_ARCHIVE_URL`,
 `REDDIT_USER_AGENT`. Profiles: `reddit --config work ...`.
@@ -127,7 +143,9 @@ Environment overrides: `REDDIT_CONFIG` (profile), `REDDIT_ARCHIVE_URL`,
 The archive is run by one person on donations. The CLI requests only the
 fields it needs, fans out at most three subreddits at a time, waits out short
 rate limits and retries a timed-out query once. For bulk work use the
-archive's monthly dumps instead of the API.
+archive's monthly dumps instead of the API. On reddit.com the CLI sends the
+User-Agent format Reddit documents, honours `X-Ratelimit-*` and never sends
+more than the anonymous window allows.
 
 ## Development
 

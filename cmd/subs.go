@@ -25,6 +25,9 @@ refreshed infrequently, so subscriber counts are approximate.`,
   reddit subs selfhosted --exact`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if useRSS(false) {
+			return liveSubs(cmd, args[0])
+		}
 		q := archive.SubredditQuery{Prefix: args[0], MinSubscribers: subsMin, Limit: subsLimit, SortType: subsSort, Sort: "desc"}
 		if subsExact {
 			q.Name, q.Prefix = args[0], ""

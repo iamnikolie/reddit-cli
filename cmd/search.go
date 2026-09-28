@@ -47,6 +47,9 @@ when it times out.`,
 			return err
 		}
 		subs := splitList(searchSubs)
+		if useRSS(false) {
+			return liveSearch(cmd, query, subs)
+		}
 		if len(subs) == 0 && searchAuthor == "" {
 			return fmt.Errorf("scope the search: add --sub <name>[,<name>] or --author <user> (the archive has no global full-text search; find subreddits with 'reddit subs <prefix>')")
 		}

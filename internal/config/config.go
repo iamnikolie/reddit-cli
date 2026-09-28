@@ -44,6 +44,9 @@ func home(profile string) (string, error) {
 	return filepath.Join(base, profile), nil
 }
 
+// Dir returns the profile directory (state files live next to config.yaml).
+func Dir(profile string) (string, error) { return home(profile) }
+
 // Path returns the config file path for a profile.
 func Path(profile string) (string, error) {
 	dir, err := home(profile)

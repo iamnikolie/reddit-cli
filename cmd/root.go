@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"time"
 
 	"github.com/iamnikolie/reddit-cli/internal/archive"
 	"github.com/iamnikolie/reddit-cli/internal/client"
 	"github.com/iamnikolie/reddit-cli/internal/config"
+	"github.com/iamnikolie/reddit-cli/internal/rss"
 	"github.com/spf13/cobra"
 )
 
@@ -44,9 +47,12 @@ var (
 	fieldsFlag   []string
 	timeout      time.Duration
 	source       string
+	live         bool
+	noWait       bool
 
-	cfg *config.Config
-	arc *archive.Client
+	cfg  *config.Config
+	arc  *archive.Client
+	rssc *rss.Client
 )
 
 var (
@@ -59,7 +65,9 @@ var rootCmd = &cobra.Command{
 	Use:   "reddit",
 	Short: "Reddit CLI — read subreddits, threads, search and users from the terminal",
 	Long: "Reddit CLI — read subreddits, threads, search and users from the terminal.\n\n" +
-		"Sources: archive (Arctic Shift, no credentials, default).\n" +
+		"Sources: archive (Arctic Shift: search, scored comment trees, history) and\n" +
+		"rss (live reddit.com feeds: hot/new/rising, ~1 request per minute per IP).\n" +
+		"--source auto (default) uses the archive except for hot/rising; --live forces rss.\n" +
 		"Run 'reddit skill' to print the full agent reference (commands, flags, workflows).",
 	SilenceUsage: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -68,10 +76,13 @@ var rootCmd = &cobra.Command{
 		default:
 			return fmt.Errorf("--format must be one of md, table, json, csv, tsv")
 		}
+		if live {
+			source = "rss"
+		}
 		switch source {
-		case "archive":
+		case "auto", "archive", "rss":
 		default:
-			return fmt.Errorf("--source %q is not available; this build supports: archive", source)
+			return fmt.Errorf("--source must be auto, archive or rss")
 		}
 		if profileExempt(cmd) {
 			return nil
@@ -88,6 +99,21 @@ var rootCmd = &cobra.Command{
 		c := client.New("archive", cfg.ArchiveURL, ua)
 		c.Verbose = verbose
 		arc = archive.New(c)
+
+		rua := cfg.UserAgent
+		if rua == "" {
+			rua = runtime.GOOS + ":reddit-cli:v" + version
+			if cfg.Username != "" {
+				rua += " (by /u/" + cfg.Username + ")"
+			} else {
+				rua += " (https://github.com/iamnikolie/reddit-cli)"
+			}
+		}
+		rc := client.New("reddit.com", rss.DefaultBaseURL, rua)
+		rc.Verbose = verbose
+		dir, _ := config.Dir(profile)
+		pacer := &rss.Pacer{StatePath: filepath.Join(dir, "rss-window.json"), Wait: !noWait, MaxWait: 90 * time.Second, Note: func(m string) { note("%s", m) }}
+		rssc = rss.New(rc, pacer)
 		return nil
 	},
 }
@@ -111,7 +137,9 @@ func init() {
 	pf.StringVar(&outputFormat, "format", "", "output format: md (default), table, json, csv, tsv")
 	pf.StringSliceVar(&fieldsFlag, "fields", nil, "comma-separated output fields for table/json/csv, e.g. id,title,score")
 	pf.DurationVar(&timeout, "timeout", 2*time.Minute, "per-request timeout (0 disables)")
-	pf.StringVar(&source, "source", "archive", "data source: archive")
+	pf.StringVar(&source, "source", "auto", "data source: auto, archive, rss")
+	pf.BoolVar(&live, "live", false, "read live reddit.com feeds (same as --source rss)")
+	pf.BoolVar(&noWait, "no-wait", false, "rss: fail instead of waiting for the next rate window")
 
 	rootCmd.Version = buildVersion()
 	rootCmd.AddCommand(versionCmd)
@@ -145,4 +173,24 @@ func reqCtx(cmd *cobra.Command) (context.Context, context.CancelFunc) {
 		return context.WithCancel(ctx)
 	}
 	return context.WithTimeout(ctx, timeout)
+}
+
+// useRSS decides the source for a command: rss when forced, archive when
+// forced, else the command's own preference under --source auto.
+func useRSS(preferRSS bool) bool {
+	switch source {
+	case "rss":
+		return true
+	case "archive":
+		return false
+	}
+	return preferRSS
+}
+
+// needRSS errors when the archive was forced for something only feeds offer.
+func needRSS(what string) error {
+	if source == "archive" {
+		return fmt.Errorf("%s needs the live reddit.com feed: drop --source archive or pass --live", what)
+	}
+	return nil
 }

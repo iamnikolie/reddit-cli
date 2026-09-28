@@ -23,6 +23,8 @@ type APIError struct {
 	Message string
 	// RetryIn is the server's advice (seconds) when Status is 429.
 	RetryIn int
+	// Header is the response header, for callers that track rate windows.
+	Header http.Header
 }
 
 func (e *APIError) Error() string {
@@ -155,7 +157,7 @@ func (c *Client) Do(ctx context.Context, r Request) ([]byte, http.Header, error)
 			}
 			return b, resp.Header, nil
 		}
-		apiErr := &APIError{Source: c.Source, Status: resp.StatusCode, Message: parseMessage(b), RetryIn: retryIn(resp.Header)}
+		apiErr := &APIError{Source: c.Source, Status: resp.StatusCode, Message: parseMessage(b), RetryIn: retryIn(resp.Header), Header: resp.Header}
 		if !retryable(resp.StatusCode) || attempt >= c.MaxRetries {
 			return nil, nil, apiErr
 		}

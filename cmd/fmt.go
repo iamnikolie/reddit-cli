@@ -52,7 +52,10 @@ func fresh(unix int64) bool {
 //     body preview…
 func postLine(r archive.Row, withSub bool, body int) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "- %s · %s · ↑%d · %dc", archive.Str(r, "id"), age(archive.Num(r, "created_utc")), archive.Num(r, "score"), archive.Num(r, "num_comments"))
+	fmt.Fprintf(&b, "- %s · %s", archive.Str(r, "id"), age(archive.Num(r, "created_utc")))
+	if _, ok := r["score"]; ok {
+		fmt.Fprintf(&b, " · ↑%d · %dc", archive.Num(r, "score"), archive.Num(r, "num_comments"))
+	}
 	if withSub {
 		fmt.Fprintf(&b, " · r/%s", archive.Str(r, "subreddit"))
 	}
@@ -88,9 +91,11 @@ func commentLine(r archive.Row, withSub bool, body int) string {
 func postHeader(p archive.Row, bodyChars int) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# %s\n", strings.TrimSpace(archive.Str(p, "title")))
-	fmt.Fprintf(&b, "r/%s · u/%s · %s (%s) · ↑%d · %d comments · id %s",
-		archive.Str(p, "subreddit"), archive.Str(p, "author"), dateTime(archive.Num(p, "created_utc")), age(archive.Num(p, "created_utc")),
-		archive.Num(p, "score"), archive.Num(p, "num_comments"), archive.Str(p, "id"))
+	fmt.Fprintf(&b, "r/%s · u/%s · %s (%s)", archive.Str(p, "subreddit"), archive.Str(p, "author"), dateTime(archive.Num(p, "created_utc")), age(archive.Num(p, "created_utc")))
+	if _, ok := p["score"]; ok {
+		fmt.Fprintf(&b, " · ↑%d · %d comments", archive.Num(p, "score"), archive.Num(p, "num_comments"))
+	}
+	fmt.Fprintf(&b, " · id %s", archive.Str(p, "id"))
 	if f := archive.Str(p, "link_flair_text"); f != "" {
 		fmt.Fprintf(&b, " · [%s]", f)
 	}

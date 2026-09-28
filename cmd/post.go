@@ -35,6 +35,7 @@ Defaults keep the output small: top 60 comments by score, 4 levels deep,
   reddit post https://www.reddit.com/r/golang/comments/1wro60n/what_do_you_use/ --top 20
   reddit post 1wro60n --sort new --depth 2 --ids
   reddit post 1wro60n --parent kx0abc1 --top 0
+  reddit post 1wro60n --live                # reddit.com feed: newest comments, flat, no scores
   reddit post 1wro60n --json`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -71,6 +72,9 @@ Defaults keep the output small: top 60 comments by score, 4 levels deep,
 }
 
 func showPost(cmd *cobra.Command, id, parent string) error {
+	if useRSS(false) {
+		return livePost(cmd, id)
+	}
 	ctx, cancel := reqCtx(cmd)
 	defer cancel()
 	posts, err := arc.PostsByID(ctx, []string{id}, nil)

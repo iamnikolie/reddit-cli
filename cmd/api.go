@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/iamnikolie/reddit-cli/internal/rss"
 	"github.com/spf13/cobra"
 )
 
@@ -14,12 +15,13 @@ var apiQuery []string
 // (aggregations, wikis, rules, interactions, time series).
 var apiCmd = &cobra.Command{
 	Use:   "api <path>",
-	Short: "Call any archive endpoint and print the JSON response",
+	Short: "Call any archive endpoint (or, with --live, any reddit.com feed) and print JSON",
 	Example: `  reddit api /api/posts/search/aggregate -q aggregate=author -q subreddit=golang -q after=30d
   reddit api /api/subreddits/rules -q subreddits=golang
   reddit api /api/subreddits/wikis/list -q subreddit=golang
   reddit api /api/time_series -q key=r/golang/posts/count -q precision=month -q after=1y
-  reddit api /api/users/interactions/users -q author=spez -q min_count=10`,
+  reddit api /api/users/interactions/users -q author=spez -q min_count=10
+  reddit api /r/golang/controversial/.rss -q t=week --live`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		path := args[0]
@@ -36,6 +38,13 @@ var apiCmd = &cobra.Command{
 		}
 		ctx, cancel := reqCtx(cmd)
 		defer cancel()
+		if useRSS(strings.Contains(path, ".rss")) {
+			entries, err := rssc.Feed(ctx, path, q)
+			if err != nil {
+				return err
+			}
+			return writeJSON(stdout, rss.Rows(entries))
+		}
 		raw, err := arc.Raw(ctx, path, q)
 		if err != nil {
 			return err

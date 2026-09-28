@@ -35,6 +35,9 @@ var userCmd = &cobra.Command{
 		if len(args) == 2 {
 			mode = args[1]
 		}
+		if useRSS(false) {
+			return liveUser(cmd, name, mode)
+		}
 		ctx, cancel := reqCtx(cmd)
 		defer cancel()
 		subs := splitList(userSub)
