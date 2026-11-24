@@ -62,6 +62,9 @@ when it times out.`,
 				limit = 100
 			}
 			rows, err = arc.Comments(ctx, archive.CommentQuery{Subreddits: subs, Author: searchAuthor, Body: query, After: searchAfter, Before: searchBefore, Limit: limit, Sort: "desc", Fields: leanFields(archive.CommentFields)})
+			if err = partialOK(err); err != nil {
+				return err
+			}
 		} else {
 			terms := parseTerms(query)
 			if terms.anchor == "" {
@@ -81,7 +84,10 @@ when it times out.`,
 				return fmt.Errorf("--in must be title or text")
 			}
 			rows, err = arc.Posts(ctx, q)
-			if terms.needsFilter() && err == nil {
+			if err = partialOK(err); err != nil {
+				return err
+			}
+			if terms.needsFilter() {
 				fetched := len(rows)
 				rows = terms.filter(rows, searchIn == "title")
 				if fetched >= 100 && len(rows) < searchLimit {
